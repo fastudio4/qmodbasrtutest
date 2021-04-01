@@ -27,9 +27,10 @@ MainWindow::MainWindow(QWidget *parent)
 //        ui->btnConnect->setDisabled(false);
 //        ui->cbxPort->setDisabled(false);
     }
-    ui->spinBoxCountReg->setValue(10);
+    ui->spinBoxCountReg->setValue(8);
     initRTU();
-    ui->spinBoxId->setValue(16);
+    ui->spinBoxId->setValue(15);
+    ui->spinBoxCountWrite->setValue(8);
     timer = new QTimer(this);
     timer->setInterval(1000);
     connect(timer, SIGNAL(timeout()), this, SLOT(on_btnReadOne_clicked()));
@@ -336,4 +337,46 @@ void MainWindow::on_btnReadLoop_clicked()
     }
 //    qDebug() << timer->isActive();
 
+}
+
+void MainWindow::on_btnWrite_clicked()
+{
+    if (!modbusDevice)
+        return;
+    statusBar()->clearMessage();
+
+    QModbusDataUnit writeUnit = writeRequest(ui->spinBoxRegisterWrite->value(), ui->spinBoxCountWrite->value());
+    QModbusDataUnit::RegisterType table = writeUnit.registerType();
+    writeUnit.setValue(ui->cbxAddrOut->currentData().toUInt(), ui->spinBoxValue->value());
+
+    if (auto *lastRequest = modbusDevice->sendWriteRequest(writeUnit, ui->spinBoxId->value())) {
+        if (!lastRequest->isFinished()) {
+            connect(lastRequest, &QModbusReply::finished, this, [this, lastRequest]() {
+                if (lastRequest->error() == QModbusDevice::ProtocolError) {
+                    statusBar()->showMessage(tr("Write response error: %1 (Mobus exception: 0x%2)")
+                        .arg(lastRequest->errorString()).arg(lastRequest->rawResult().exceptionCode(), -1, 16),
+                        5000);
+                } else if (lastRequest->error() != QModbusDevice::NoError) {
+                    statusBar()->showMessage(tr("Write response error: %1 (code: 0x%2)").
+                        arg(lastRequest->errorString()).arg(lastRequest->error(), -1, 16), 5000);
+                }
+                lastRequest->deleteLater();
+            });
+        } else {
+            // broadcast replies return immediately
+            lastRequest->deleteLater();
+        }
+    } else {
+        statusBar()->showMessage(tr("Write error: ") + modbusDevice->errorString(), 5000);
+    }
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    int count = ui->spinBoxCountWrite->value();
+    ui->cbxAddrOut->clear();
+    for (int i = 0; i < count ; i++ )
+    {
+        ui->cbxAddrOut->addItem(QString::number(i), i);
+    }
 }

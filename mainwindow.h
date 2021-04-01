@@ -45,6 +45,10 @@ private slots:
 
     void on_btnReadLoop_clicked();
 
+    void on_btnWrite_clicked();
+
+    void on_pushButton_clicked();
+
 private:
     QSerialPort *port;
     Ui::MainWindow *ui;
